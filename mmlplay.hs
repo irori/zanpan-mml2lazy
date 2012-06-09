@@ -1,8 +1,9 @@
-import Data.Ratio
 import Data.List
 import Data.Word
 import qualified Data.ByteString.Lazy as B
 
+durUnit :: Int
+durUnit = 64
 samplingRate :: Int
 samplingRate = 8000
 volume :: Word8
@@ -11,10 +12,10 @@ volume = 40
 data Context = Context {
       tempo :: Int
     , octave :: Int
-    , defaultLength :: Rational
+    , defaultLength :: Int
     } deriving (Show)
 
-initialContext = Context { tempo = 183, octave = 0, defaultLength = 1 % 4 }
+initialContext = Context { tempo = 183, octave = 0, defaultLength = quot durUnit 4 }
 
 data Note = Rest Dur
           | Note Freq Dur
@@ -51,18 +52,18 @@ tone 'b' = 2
 tone c = error $ "invalid character " ++ [c]
 
 frequency :: Int -> Int -> Int
-frequency n oct = round $ 440 * 2 ** fromRational (fromIntegral n % 12 + fromIntegral oct)
+frequency n oct = round $ 440 * 2 ** fromRational (fromIntegral n / 12 + fromIntegral oct)
 
-readLen :: Context -> String -> (Rational, String)
-readLen ctx ('.':s) = (defaultLength ctx * 3 / 2, s)
+readLen :: Context -> String -> (Int, String)
+readLen ctx ('.':s) = (quot (defaultLength ctx * 3) 2, s)
 readLen ctx s =
     case reads s of
-      [(n, '.':s')] -> (3 % (2*n), s')
-      [(n, s')] -> (1 % n, s')
+      [(n, '.':s')] -> (quot (durUnit * 3) (2 * n), s')
+      [(n, s')] -> (quot durUnit n, s')
       [] -> (defaultLength ctx, s)
 
-duration :: Context -> Rational -> Dur
-duration ctx r = round $ fromIntegral samplingRate * r * 240 / fromIntegral (tempo ctx)
+duration :: Context -> Int -> Dur
+duration ctx r = r * (quot (fromIntegral samplingRate * 240) (tempo ctx * durUnit))
 
 play :: [Note] -> [Word8]
 play [] = []
@@ -80,3 +81,4 @@ part3 = "l4r1.gf+ef+ef+g2gf+ef+ede2gf+ef+eg.r1r1r4.gf+ef+ef+g2gf+ef+ede2gf+ef+eg
 music = map (foldl1 (+)) (transpose parts)
     where parts = map (play . parsePart initialContext) [part1, part2, part3]
 main = B.putStr (B.pack music)
+--main = putStrLn $ show $ parsePart initialContext part1
