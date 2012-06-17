@@ -1,7 +1,7 @@
 #!/usr/local/bin/gosh
 (use srfi-13)
 
-(load "lazier.scm")
+(load "./lazier.scm")
 (load "syntax.scm")
 (load "optimize.scm")
 (load "prelude.scm")
@@ -32,26 +32,26 @@
       '()
       (let ((tok (car tokens))
             (tokens (cdr tokens)))
-        (ecase (string-ref tok 0)
-               ((#\>)
-                (parse-part (+ octave 1) deflen volume tokens))
-               ((#\<)
-                (parse-part (- octave 1) deflen volume tokens))
-               ((#\o)
-                (parse-part (string->number (string-cdr tok))
-                            deflen volume tokens))
-               ((#\v)
-                (parse-part octave deflen
-                            (string->number (string-cdr tok)) tokens))
-               ((#\l)
-                (parse-part octave (parse-length (string-cdr tok)) volume
-                            tokens))
-               ((#\r)
-                (cons (make-rest (parse-length (string-cdr tok) deflen))
-                      (parse-part octave deflen volume tokens)))
-               ((#\a #\b #\c #\d #\e #\f #\g)
-                (cons (parse-note tok octave deflen volume)
-                      (parse-part octave deflen volume tokens)))))))
+        (case (string-ref tok 0)
+          ((#\>)
+           (parse-part (+ octave 1) deflen volume tokens))
+          ((#\<)
+           (parse-part (- octave 1) deflen volume tokens))
+          ((#\o)
+           (parse-part (string->number (string-cdr tok))
+                       deflen volume tokens))
+          ((#\v)
+           (parse-part octave deflen
+                       (string->number (string-cdr tok)) tokens))
+          ((#\l)
+           (parse-part octave (parse-length (string-cdr tok)) volume
+                       tokens))
+          ((#\r)
+           (cons (make-rest (parse-length (string-cdr tok) deflen))
+                 (parse-part octave deflen volume tokens)))
+          ((#\a #\b #\c #\d #\e #\f #\g)
+           (cons (parse-note tok octave deflen volume)
+                 (parse-part octave deflen volume tokens)))))))
 
 (define (parse-length s :optional default)
   (rxmatch-let (rxmatch #/^(\d*)(\.)?$/ s) (#f n dot)
@@ -76,7 +76,7 @@
                   volume)))))
 
 (define (tone ch)
-  (ecase ch
+  (case ch
     ((#\c) -9)
     ((#\d) -7)
     ((#\e) -5)
@@ -147,7 +147,7 @@
             (lambda (t parity dur vol)
               (take (rec tl) dur (square vol t parity)))))))))
 
-  (lazy-def 'mix
+  (lazy-def 'mix-parts
     '((lambda (x) (x x))
       (lambda (rec xs ys)
         (xs (lambda (xhd xtl)
@@ -156,10 +156,12 @@
                           (rec rec xtl ytl)))))))))
 
   (lazy-def '(main _)
-    (fold1 (lambda (x y) `(mix ,x ,y))
-           (map (lambda (part)
-                  `(play-part ,(generate-play-data part)))
-                parts)))
+    `(let ((play play-part)
+           (mix mix-parts))
+       ,(fold1 (lambda (x y) `(mix ,x ,y))
+               (map (lambda (part)
+                      `(play ,(generate-play-data part)))
+                    parts))))
   )
 
 
@@ -180,6 +182,7 @@
                          (parse-part initial-octave initial-deflen initial-volume
                                      (tokenize line)))
                        lines))))
+;      (display (map generate-play-data parts)) (newline)
       (define-lazyk-functions parts)
       (print-as-unlambda (laze 'main)))))
 
