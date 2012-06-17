@@ -11,7 +11,7 @@
 (define sampling-rate 8000)
 (define initial-octave 0)
 (define initial-deflen (/ dur-unit 4))
-(define initial-volume 15)
+(define initial-volume 16)
 (define *tempo* 120)
 
 ;; MML parser
@@ -38,7 +38,7 @@
           ((#\<)
            (parse-part (- octave 1) deflen volume tokens))
           ((#\o)
-           (parse-part (string->number (string-cdr tok))
+           (parse-part (- (string->number (string-cdr tok)) 4)
                        deflen volume tokens))
           ((#\v)
            (parse-part octave deflen
