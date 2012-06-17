@@ -20,9 +20,9 @@
   (cond ((rxmatch #/^([<>]|[ov]\d+|l\d+\.?|[a-gr][-+]?\d*\.?)/ str)
          => (lambda (m)
               (cons (m 0) (tokenize (rxmatch-after m)))))
-        ((> (string-length str) 0)
-         (error "parse error: " str))
-        (else '())))
+        ((string-null? str) '())
+        (else
+         (error "parse error: " str))))
 
 (define (string-cdr s)
   (string-copy s 1))
@@ -114,14 +114,13 @@
            part)
     (note 1 I 1 256)))
 
-(define mml "l8cdefedcrefgagferc4c4c4c4l16ccddeeffl8edc4r1")
-;(define mml "v13l4r1.gf+ef+ef+g2gf+ef+ede2gf+ef+eg.r1r1r4.gf+ef+ef+g2gf+ef+ede2gf+ef+eg2l1rrrrl8r<ereeereeereerf4l1rrrrrrl8rereeereeereerf4l1rrrrrrrrr2.>l4gf+ef+ef+g2gf+ef+ede2gf+ef+eg.r1r1r4.gf+ef+ef+g2gf+ef+ede2")
-(define part (parse-part initial-octave initial-deflen initial-volume (tokenize mml)))
-;(display (generate-play-data part))
-
-(lazy-def 'unit-duration (unit-length *tempo*))
 
 ;; Lazy K functions
+
+(define (fold1 f xs)
+  (if (null? (cdr xs))
+      (car xs)
+      (f (car xs) (fold1 f (cdr xs)))))
 
 (define (define-lazyk-functions parts)
   (lazy-def '(square vol n parity)
@@ -139,7 +138,7 @@
   (lazy-def '(note t parity dur vol)
     '(lambda (f) (f t parity dur vol)))
 
-  (lazy-def 'play
+  (lazy-def 'play-part
     '(Y
       (lambda (rec music)
         (music
@@ -148,11 +147,19 @@
             (lambda (t parity dur vol)
               (take (rec tl) dur (square vol t parity)))))))))
 
-  (lazy-def 'music
-            (generate-play-data (car parts)))
+  (lazy-def 'mix
+    '((lambda (x) (x x))
+      (lambda (rec xs ys)
+        (xs (lambda (xhd xtl)
+              (ys (lambda (yhd ytl)
+                    (cons (+ xhd yhd)
+                          (rec rec xtl ytl)))))))))
 
   (lazy-def '(main _)
-    '(play music))
+    (fold1 (lambda (x y) `(mix ,x ,y))
+           (map (lambda (part)
+                  `(play-part ,(generate-play-data part)))
+                parts)))
   )
 
 
@@ -167,10 +174,12 @@
           (set! *tempo* (string->number (string-cdr (car lines))))
           (set! lines (cdr lines))))
     (lazy-def 'unit-duration (unit-length *tempo*))
-    (let ((parts (map (lambda (line)
-                        (parse-part initial-octave initial-deflen initial-volume
-                                    (tokenize line)))
-                      lines)))
+    (let ((parts (remove
+                  null?
+                  (map (lambda (line)
+                         (parse-part initial-octave initial-deflen initial-volume
+                                     (tokenize line)))
+                       lines))))
       (define-lazyk-functions parts)
       (print-as-unlambda (laze 'main)))))
 
