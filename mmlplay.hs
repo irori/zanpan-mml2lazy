@@ -8,23 +8,27 @@ durUnit :: Int
 durUnit = 64
 samplingRate :: Int
 samplingRate = 8000
-volume :: Word8
-volume = 40
 
 data Context = Context {
       tempo :: Int
     , octave :: Int
     , defaultLength :: Int
+    , volume :: Vol
     } deriving (Show)
 
-initialContext = Context { tempo = 183, octave = 0, defaultLength = quot durUnit 4 }
+initialContext = Context { tempo = 183,
+                           octave = 0,
+                           defaultLength = quot durUnit 4,
+                           volume = 16
+                         }
 
 data Note = Rest Dur
-          | Note Freq Dur
+          | Note Freq Dur Vol
      deriving Show
 
 type Dur = Int
 type Freq = Int
+type Vol = Word8
 
 parsePart :: Context -> String -> [Note]
 parsePart ctx [] = []
@@ -32,9 +36,13 @@ parsePart ctx ('>':s) = parsePart ctx{ octave = octave ctx + 1 } s
 parsePart ctx ('<':s) = parsePart ctx{ octave = octave ctx - 1 } s
 parsePart ctx ('l':s) = parsePart ctx{ defaultLength = len } s'
     where (len, s') = readLen ctx s
+parsePart ctx ('v':s) = parsePart ctx{ volume = vol } s'
+    where [(vol, s')] = readDec s
+parsePart ctx ('o':s) = parsePart ctx{ octave = oct - 4 } s'
+    where [(oct, s')] = readDec s
 parsePart ctx ('r':s) = Rest (duration ctx len) : parsePart ctx s'
     where (len, s') = readLen ctx s
-parsePart ctx s = Note freq (duration ctx len) : parsePart ctx s''
+parsePart ctx s = Note freq (duration ctx len) (volume ctx) : parsePart ctx s''
     where (freq, s') = readPitch ctx s
           (len, s'') = readLen ctx s'
 
@@ -70,11 +78,13 @@ duration ctx r = r * (quot (fromIntegral samplingRate * 240) (tempo ctx * durUni
 play :: [Note] -> [Word8]
 play [] = []
 play (Rest dur : ns) = replicate dur 0 ++ play ns
-play (Note freq dur : ns) = take dur (square freq) ++ play ns
+play (Note freq dur vol : ns) = take dur (square freq vol) ++ play ns
 
-square :: Int -> [Word8]
-square freq = cycle $ replicate t volume ++ replicate t 0
-    where t = round $ fromIntegral samplingRate / 2 / fromIntegral freq
+square :: Int -> Vol -> [Vol]
+square freq vol = cycle $ replicate th vol ++ replicate tl 0
+    where t = round $ fromIntegral samplingRate / fromIntegral freq
+          th = quot t 2
+          tl = t - th
 
 parseMML :: String -> [[Note]]
 parseMML mml = [parsePart initialContext $ map toLower line | line <- lines mml]
@@ -85,4 +95,4 @@ playMML mml = map (foldl1 (+)) (transpose parts)
 
 main = do input <- getContents
           B.putStr $ B.pack $ playMML input
---main = putStrLn $ show $ parsePart initialContext "l8dd32e16"
+--          mapM_ putStrLn $ map show $ parseMML input
