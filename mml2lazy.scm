@@ -2,10 +2,9 @@
 (use srfi-13)
 
 (load "./lazier.scm")
-(load "syntax.scm")
-(load "optimize.scm")
-(load "prelude.scm")
-(load "churchnum.scm")
+(load "./syntax.scm")
+(load "./prelude.scm")
+(load "./churchnum.scm")
 
 (define dur-unit 64)
 (define sampling-rate 8000)

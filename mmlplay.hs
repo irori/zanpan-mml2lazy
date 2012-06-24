@@ -16,7 +16,7 @@ data Context = Context {
     , volume :: Vol
     } deriving (Show)
 
-initialContext = Context { tempo = 183,
+initialContext = Context { tempo = 120,
                            octave = 0,
                            defaultLength = quot durUnit 4,
                            volume = 16
@@ -42,9 +42,16 @@ parsePart ctx ('o':s) = parsePart ctx{ octave = oct - 4 } s'
     where [(oct, s')] = readDec s
 parsePart ctx ('r':s) = Rest (duration ctx len) : parsePart ctx s'
     where (len, s') = readLen ctx s
+parsePart ctx ('n':s) = Note freq (duration ctx len) (volume ctx) : parsePart ctx s''
+    where (freq, s') = readNote ctx s
+          (len, s'') = readLen ctx s'
 parsePart ctx s = Note freq (duration ctx len) (volume ctx) : parsePart ctx s''
     where (freq, s') = readPitch ctx s
           (len, s'') = readLen ctx s'
+
+readNote :: Context -> String -> (Freq, String)
+readNote ctx s = (frequency (n - 9) 0, s')
+    where [(n, s')] = readDec s
 
 readPitch :: Context -> String -> (Freq, String)
 readPitch ctx (ch : '+' : s) = (frequency (tone ch + 1) (octave ctx), s)
@@ -86,8 +93,13 @@ square freq vol = cycle $ replicate th vol ++ replicate tl 0
           th = quot t 2
           tl = t - th
 
+parseParts ctx ls = [parsePart ctx $ map toLower line | line <- ls]
+
 parseMML :: String -> [[Note]]
-parseMML mml = [parsePart initialContext $ map toLower line | line <- lines mml]
+parseMML ('t':mml) = parseParts (initialContext{tempo=t}) tl
+    where (hd:tl) = lines mml
+          [(t, _)] = readDec hd
+parseMML mml = parseParts initialContext (lines mml)
 
 playMML :: String -> [Word8]
 playMML mml = map (foldl1 (+)) (transpose parts)
