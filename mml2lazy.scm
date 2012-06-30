@@ -138,10 +138,11 @@
       '()
       (let ((rest (compress-play-data (cdr part)))
 	    (i (list-index (lambda (x) (equal? (car part) x)) (cdr part))))
-	(if i
-	    `(ref ,i ,rest)
-	    `(cons ,(cons 'note (car part))
-		   ,rest)))))
+	(cond ((not i)
+	       `(cons ,(cons 'note (car part))
+		      ,rest))
+	      ((= i 0) `(ref0 ,rest))
+	      (else `(ref ,i ,rest))))))
 
 ;; Lazy K functions
 
@@ -158,6 +159,8 @@
 
   (lazy-def '(ref n xs)
     '(cons (nth n xs) xs))
+  (lazy-def '(ref0 xs)
+    '(cons (car xs) xs))
 
   (lazy-def '(take rest n)
     '((* n unit-duration)
