@@ -2,6 +2,9 @@
 ;; MML -> LazyK converter
 ;; Copyright 2012 irori <irorin@gmail.com>
 ;;
+;; usage:
+;;   mml2lazy.scm hoge.mml > hoge.lazy
+;;
 ;; MML Syntax:
 ;;
 ;; <MML> := <tempo>?<part>(\n<part>)*
@@ -33,6 +36,7 @@
 
 ;; MML parser
 
+;; MML をトークンに分解する
 (define (tokenize str)
   (cond ((rxmatch #/^([<>]|[ov]\d+|l\d+\.?|[a-gr][-+]?\d*\.?)/ str)
          => (lambda (m)
@@ -44,6 +48,7 @@
 (define (string-cdr s)
   (string-copy s 1))
 
+;; 1 つのパートをパースする
 (define (parse-part octave deflen volume tokens)
   (if (null? tokens)
       '()
@@ -165,6 +170,18 @@
 ;; Lazy K functions
 
 (define (define-lazyk-functions parts)
+  ;; 音符 1 つのデータ
+  ;; 周波数 (1 / 2t+parity), 長さ dur, 音量 vol
+  ;; note :: Int -> Int -> Int -> Int -> Note
+  (lazy-def '(note t parity dur vol)
+    '(lambda (f) (f t parity dur vol)))
+
+  ;; 楽譜データ圧縮用
+  (lazy-def '(ref n xs)
+    '(cons (nth n xs) xs))
+  (lazy-def '(ref0 xs)
+    '(cons (car xs) xs))
+
   ;; square :: Int -> Int -> Int -> [Int]
   ;; 周期 (2n + parity), 振幅 vol の矩形波を生成する
   (lazy-def '(square vol n parity)
@@ -181,19 +198,7 @@
                (S (S I (K hd)) (K (g tl))))))  ; (cons hd (g tl))
       (K rest)))
 
-  ;; 音符 1 つのデータ
-  ;; 周波数 (1 / 2t+parity), 長さ dur, 音量 vol
-  ;; note :: Int -> Int -> Int -> Int -> Note
-  (lazy-def '(note t parity dur vol)
-    '(lambda (f) (f t parity dur vol)))
-
-  ;; 楽譜データ圧縮用
-  (lazy-def '(ref n xs)
-    '(cons (nth n xs) xs))
-  (lazy-def '(ref0 xs)
-    '(cons (car xs) xs))
-
-  ;; 1 つのパートを再生する（波形を生成する）
+  ;; 1 つのパートの波形を生成する
   ;; play-part :: [Note] -> [Int]
   (lazy-def 'play-part
     '(Y
@@ -251,8 +256,11 @@
       (if *dump-score*
 	  (for-each
 	   (lambda (part)
+	     (display "(n")
 	     (for-each (lambda (note) (display note) (newline))
-		       part))
+		       (generate-play-data part))
+	     (display ")\n")
+	     )
 	   parts)
 	  (begin
 	    (define-lazyk-functions parts)
