@@ -98,6 +98,11 @@
 (define (make-note pitch dur vol)
   (list pitch dur vol))
 
+(define (part-duration part)
+  (if (null? part)
+      0
+      (+ (cadar part) (part-duration (cdr part)))))
+
 (define (generate-play-data part)
   `(list
     ,@(map (lambda (x)
@@ -208,7 +213,7 @@
                          (parse-part initial-octave initial-deflen initial-volume
                                      (tokenize line)))
                        lines))))
-;      (display (map generate-play-data2 parts)) (newline))))
+;      (display (map part-duration parts)) (newline))))
       (define-lazyk-functions parts)
       (print-as-unlambda (laze 'main)))))
 
