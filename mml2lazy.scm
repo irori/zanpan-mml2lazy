@@ -1,5 +1,6 @@
 #!/usr/local/bin/gosh
-;; MML -> LazyK converter  by irori <irorin@gmail.com>
+;; MML -> LazyK converter
+;; Copyright 2012 irori <irorin@gmail.com>
 ;;
 ;; MML Syntax:
 ;;
@@ -230,6 +231,8 @@
 
 ;; main
 
+(define *dump-score* #f)
+
 (define (mml2lazy port)
   (let ((lines (map (lambda (s)
                       (string-delete (string-downcase s) char-whitespace?))
@@ -245,11 +248,21 @@
                          (parse-part initial-octave initial-deflen initial-volume
                                      (tokenize line)))
                        lines))))
-;      (display (map part-duration parts)) (newline))))
-      (define-lazyk-functions parts)
-      (print-as-unlambda (laze 'main)))))
+      (if *dump-score*
+	  (for-each
+	   (lambda (part)
+	     (for-each (lambda (note) (display note) (newline))
+		       part))
+	   parts)
+	  (begin
+	    (define-lazyk-functions parts)
+	    (print-as-unlambda (laze 'main)))))))
 
 (define (main args)
+  (if (and (not (null? (cdr args))) (equal? (cadr args) "-d"))
+      (begin
+	(set! *dump-score* #t)
+	(set! args (cdr args))))
   (if (null? (cdr args))
       (mml2lazy (current-input-port))
       (call-with-input-file (cadr args)
