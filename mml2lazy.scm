@@ -1,4 +1,21 @@
 #!/usr/local/bin/gosh
+;; MML -> LazyK converter  by irori <irorin@gmail.com>
+;;
+;; MML Syntax:
+;;
+;; <MML> := <tempo>?<part>(\n<part>)*
+;; <tempo> := t<digits>                -- テンポ (t120なら120BPM。初期値は120)
+;; <part> := <elem>*
+;; <elem> := [cdefgab][+-]?<length>?   -- 音符
+;;         | r<length>?                -- 休符
+;;         | l<length>                 -- デフォルトの音長指定 (初期値は4)
+;;         | o<digits>                 -- オクターブ変更 (初期値は4)
+;;         | '>'                       -- オクターブ 1 上げる
+;;         | '<'                       -- オクターブ 1 下げる
+;;         | v<digits>                 -- ボリューム変更 (初期値は16)
+;; <length> := (1|2|4|8|16|32).?       -- 音の長さ。.をつけると3/2倍
+;; <digits> := [0-9]+
+
 (use srfi-13)
 
 (load "./lazier.scm")
@@ -146,22 +163,16 @@
 
 ;; Lazy K functions
 
-(define (fold1 f xs)
-  (if (null? (cdr xs))
-      (car xs)
-      (f (car xs) (fold1 f (cdr xs)))))
-
 (define (define-lazyk-functions parts)
+  ;; square :: Int -> Int -> Int -> [Int]
+  ;; 周期 (2n + parity), 振幅 vol の矩形波を生成する
   (lazy-def '(square vol n parity)
     '(Y (lambda (x)
           (n (cons vol)
              (parity n (cons 0) x)))))
 
-  (lazy-def '(ref n xs)
-    '(cons (nth n xs) xs))
-  (lazy-def '(ref0 xs)
-    '(cons (car xs) xs))
-
+  ;; take :: [a] -> Int -> [a] -> [a]
+  ;; take ys n xs は xs の先頭要素 n 個と ys を連結したものを返す
   (lazy-def '(take rest n)
     '((* n unit-duration)
       (lambda (g lst)
@@ -169,9 +180,20 @@
                (S (S I (K hd)) (K (g tl))))))  ; (cons hd (g tl))
       (K rest)))
 
+  ;; 音符 1 つのデータ
+  ;; 周波数 (1 / 2t+parity), 長さ dur, 音量 vol
+  ;; note :: Int -> Int -> Int -> Int -> Note
   (lazy-def '(note t parity dur vol)
     '(lambda (f) (f t parity dur vol)))
 
+  ;; 楽譜データ圧縮用
+  (lazy-def '(ref n xs)
+    '(cons (nth n xs) xs))
+  (lazy-def '(ref0 xs)
+    '(cons (car xs) xs))
+
+  ;; 1 つのパートを再生する（波形を生成する）
+  ;; play-part :: [Note] -> [Int]
   (lazy-def 'play-part
     '(Y
       (lambda (rec music)
@@ -181,6 +203,8 @@
             (lambda (t parity dur vol)
               (take (rec tl) dur (square vol t parity)))))))))
 
+  ;; 2 つの波形データを合成する
+  ;; mix-parts :: [Int] -> [Int] -> [Int]
   (lazy-def 'mix-parts
     '((lambda (x) (x x))
       (lambda (rec xs ys)
@@ -189,6 +213,7 @@
                     (cons (+ xhd yhd)
                           (rec rec xtl ytl)))))))))
 
+  ;; エントリポイント
   (lazy-def '(main _)
     `(let ((play play-part)
            (mix mix-parts))
@@ -198,6 +223,10 @@
                     parts))))
   )
 
+(define (fold1 f xs)
+  (if (null? (cdr xs))
+      (car xs)
+      (f (car xs) (fold1 f (cdr xs)))))
 
 ;; main
 
