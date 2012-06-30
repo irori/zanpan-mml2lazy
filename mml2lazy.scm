@@ -113,6 +113,30 @@
            part)
     (note 1 I 1 256)))
 
+(define (generate-play-data2 part)
+  (compress-play-data
+   (append
+    (map
+     (lambda (x)
+       (if (eq? (car x) 'R)
+	   (list 1 'I (cadr x) 0)
+	   (let1 f (freq-inv (car x))
+	     (list (quotient f 2)
+		   (if (odd? f) 'succ 'I)
+		   (cadr x)
+		   (caddr x)))))
+     part)
+    '((1 I 1 256)))))
+
+(define (compress-play-data part)
+  (if (null? part)
+      '()
+      (let ((rest (compress-play-data (cdr part)))
+	    (i (list-index (lambda (x) (equal? (car part) x)) (cdr part))))
+	(if i
+	    `(ref ,i ,rest)
+	    `(cons ,(cons 'note (car part))
+		   ,rest)))))
 
 ;; Lazy K functions
 
@@ -126,6 +150,9 @@
     '(Y (lambda (x)
           (n (cons vol)
              (parity n (cons 0) x)))))
+
+  (lazy-def '(ref n xs)
+    '(cons (nth n xs) xs))
 
   (lazy-def '(take rest n)
     '((* n unit-duration)
@@ -159,7 +186,7 @@
            (mix mix-parts))
        ,(fold1 (lambda (x y) `(mix ,x ,y))
                (map (lambda (part)
-                      `(play ,(generate-play-data part)))
+                      `(play ,(generate-play-data2 part)))
                     parts))))
   )
 
@@ -181,7 +208,7 @@
                          (parse-part initial-octave initial-deflen initial-volume
                                      (tokenize line)))
                        lines))))
-;      (display (map generate-play-data parts)) (newline)
+;      (display (map generate-play-data2 parts)) (newline))))
       (define-lazyk-functions parts)
       (print-as-unlambda (laze 'main)))))
 
